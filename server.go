@@ -4,14 +4,15 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"job_manager/data_loaders"
-	"job_manager/service"
+	"job_manager/coordinator/data_loaders"
+	"job_manager/coordinator/service"
+	"job_manager/on_demand/router"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
-
+	"sync/atomic"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 
@@ -26,6 +27,8 @@ type server struct {
 	jobQueue   chan *pb.GetJobResponse
 	pipelineID string
 	runID      string
+	healthTimeout uint32
+	jobCount atomic.Uint64
 	logger     *zap.Logger
 }
 
@@ -37,6 +40,7 @@ func (s *server) GetJob(ctx context.Context, args *pb.GetJobRequest) (*pb.GetJob
 		return &pb.GetJobResponse{Type: pb.JobType_wait}, nil
 	}
 
+	job.Id = s.jobCount.Add(1)
 	currentTime := time.Now()
 	s.stateChan <- service.StateUpdate{
 		UpdateType: service.RequestJob,
@@ -48,6 +52,8 @@ func (s *server) GetJob(ctx context.Context, args *pb.GetJobRequest) (*pb.GetJob
 		},
 	}
 
+	s.logger.Info("job", zap.Any("job", job))
+
 	return job, nil
 }
 
@@ -56,6 +62,9 @@ func (s *server) FinishJob(ctx context.Context, args *pb.FinishJobRequest) (*pb.
 		UpdateType: service.FinishJob,
 		JobId:      args.GetId(),
 	}
+
+	s.logger.Info("finished", zap.Any("job", args.GetId()))
+
 	return &pb.FinishJobResponse{}, nil
 }
 
@@ -71,6 +80,7 @@ func (s *server) GetMetadata(ctx context.Context, args *pb.GetMetadataRequest) (
 	return &pb.GetMetadataResponse{
 		RunId:      s.runID,
 		PipelineId: s.pipelineID,
+		HealthTimeout: s.healthTimeout,
 	}, nil
 }
 
@@ -101,32 +111,38 @@ func main() {
 	}
 	healthInterval := time.Duration(interval) * time.Second
 	healthTimeout := time.Duration(timeout) * time.Second
+	offset := os.Getenv("OFFSET")
 
 	pipelineID := os.Getenv("PIPELINE_ID")
 	runID := os.Getenv("RUN_ID")
 	runID += time.Now().Format("_2006-01-02_15:04:05")
 	logger.Info(runID)
-	loader_flag := flag.String("loader", "test", "Specify the data loader for the manager. Options are \"weaviate\", \"map_descrip\", \"test\".")
+	loader_type := flag.String("loader_type", "test", "Specify the data loader for the manager. Options are \"weaviate\", \"map_descrip\", \"test\".")
+	enable_loader := flag.Bool("set_loader", true, "Enables the data loader.")
 	flag.Parse()
-
-	var loader data_loaders.DataLoader
-	switch *loader_flag {
-	// case "weaviate":
-	// 	loader = &data_loaders.WeaviateLoader{}
-	case "map_descrip":
-		loader = &data_loaders.DescriptionsLoader{}
-	case "test":
-		loader = &data_loaders.TestLoader{}
-	default:
-		logger.Fatal("Invalid dataloader")
-	}
-	loader.Init()
 
 	stateChan := make(chan service.StateUpdate)
 	jobQueue := make(chan *pb.GetJobResponse, miniBatchSize)
 	var wg sync.WaitGroup
 	go service.ManageJobStates(ctx, logger, stateChan, jobQueue, &wg, healthInterval, healthTimeout)
-	go service.QueueJobs(ctx, logger, jobQueue, &wg, groupSize, miniBatchSize, loader)
+
+	if *enable_loader {
+		var loader data_loaders.DataLoader
+		switch *loader_type {
+		case "weaviate":
+			loader = &data_loaders.WeaviateLoader{}
+		case "map_descrip":
+			loader = &data_loaders.DescriptionsLoader{}
+		case "test":
+			loader = &data_loaders.TestLoader{}
+		default:
+			logger.Fatal("Invalid dataloader")
+		}
+		loader.Init(offset)	
+		go service.QueueJobs(ctx, logger, jobQueue, &wg, groupSize, miniBatchSize, loader)
+	}
+
+	go router.StartOnDemandServer(logger, jobQueue)
 
 	s := grpc.NewServer()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 50051))
@@ -138,6 +154,7 @@ func main() {
 		runID:      runID,
 		logger:     logger,
 		stateChan:  stateChan,
+		healthTimeout: uint32(healthTimeout.Seconds()),
 		jobQueue:   jobQueue,
 	})
 	logger.Info("server listening", zap.String("address", lis.Addr().String()))

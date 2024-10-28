@@ -13,6 +13,7 @@ service JobManager {
 enum JobType {
   wait = 0;
   batch = 1;
+  on_demand = 2;
 }
 
 message GetJobRequest {
@@ -38,11 +39,7 @@ message MapDescription {
 }
 
 message WeaviateJob {
-  repeated WeaviateText paragraphs = 1;
-}
-
-message WeaviateText {
-  string text = 1;
+  repeated string paragraph_ids = 1;
 }
 
 message TestJob {
@@ -69,5 +66,6 @@ message GetMetadataRequest {
 message GetMetadataResponse {
   string run_id = 1;
   string pipeline_id = 2;
+  uint32 health_timeout = 3;
 }
 
