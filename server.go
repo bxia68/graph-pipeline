@@ -117,8 +117,8 @@ func main() {
 	runID := os.Getenv("RUN_ID")
 	runID += time.Now().Format("_2006-01-02_15:04:05")
 	logger.Info(runID)
-	loader_type := flag.String("loader_type", "test", "Specify the data loader for the manager. Options are \"weaviate\", \"map_descrip\", \"test\".")
-	enable_loader := flag.Bool("set_loader", true, "Enables the data loader.")
+	loader_type := flag.String("loader-type", "test", "Specify the data loader for the manager. Options are \"weaviate\", \"map_descrip\", \"test\".")
+	enable_loader := flag.Bool("set-loader", true, "Enables the data loader.")
 	flag.Parse()
 
 	stateChan := make(chan service.StateUpdate)

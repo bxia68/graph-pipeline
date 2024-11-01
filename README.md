@@ -1,10 +1,10 @@
-# Job Manager
+# Graph Pipeline
 
-Job Manager is a Go application designed to manage and schedule jobs concurrently. 
+This job manager is a Go application designed to manage and schedule jobs concurrently. 
 It supports both job queueing from various data sources like Weaviate and Macrostrat, or directly via POST requests. 
 This system is structured to work with worker nodes that execute and store results of jobs.
 
-## Extra Details
+## Details
 - **Health Checks:** Regular health checks are performed to ensure jobs have not timed out. 
 - **Data Loaders:** Supports different data loaders which can be specified at runtime. 
 
@@ -24,14 +24,38 @@ This system is structured to work with worker nodes that execute and store resul
   - Build the manager:
 ```docker build -t job-manager .```
   - Run the container in on-demand mode:
-```docker run -it --env-file .env -p 8000:8000 job-manager```
+```docker run -it --env-file .env -p 50051:50051 -p 8000:8000 job-manager --set-loader=false```
+
+    - Port `50051` is used for gRPC communication with worker nodes. Port `8000` is exposed for the `/submit_job` endpoint.
+    - The port should match the address in the worker's `MANAGER_HOST` environment variable.
+
   - Optionally, specify a data loader when running the container (currently supports "weaviate" and "map_descrip"):
-```docker run -it --env-file .env -p 8000:8000 job-manager --loader=weaviate```
+```docker run -it --env-file .env -p 50051:50051 job-manager --loader-type=weaviate```
+
+    - This will continuously queue data from the specified data source.
 
 ## API Endpoints
 
 - `POST /submit_job`: Submit a new job.
-  - Example body:
-    ```json
-    {"JobData": ["00000b77-48bc-4ed2-accb-6dc5c393202e", "000011c7-3353-4588-8a5c-e3b783c825c6"]}
-    ```
+  - Example body for weaviate data:
+  ```json
+  {
+    "weaviate_data": {
+      "paragraph_ids": [
+        "0f8ce52f-8f0e-4b58-a6a6-7515a9965526",
+        "53947580-833f-4eb3-8413-efbbddfa890b"
+      ]
+    }
+  }
+  ```
+  - Example body for map description data:
+  ```json
+  {
+    "map_description_data": {
+      "legend_ids": [
+        36046,
+        36049
+      ]
+    }
+  }
+  ```
