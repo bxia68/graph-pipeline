@@ -1,0 +1,17 @@
+version: '3.3'
+
+services:
+  coordinator:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    entrypoint: ["./server", "--set-loader=false"]
+
+  # set worker container fields here
+  worker:
+    image: ghcr.io/bxia68/llm_kg_generator:dev057 
+    env_file:
+      - .env
+    entrypoint: ["./cosmos_start.sh"]
