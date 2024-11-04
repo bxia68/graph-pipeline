@@ -12,13 +12,15 @@ This system is structured to work with worker nodes that execute and store resul
 
 ### Running the Application
 
+#### Running the Coordinator Individually
+
 1. Set the necessary environment variables:
-   - `GROUP_SIZE`: Defines the number of jobs processed in a batch. The manager will not queue a new group until the current one is completed.
-   - `MINI_BATCH_SIZE`: Specifies the number of tasks in each job (ie. number of paragraphs in a job)
-   - `HEALTH_INTERVAL`: Time interval in seconds for how often the manager checks for timed out jobs.
-   - `HEALTH_TIMEOUT`: Duration in seconds after which a job is considered timed out if no health check is received. Jobs will be requeued if they have timed out.
-   - `PIPELINE_ID`: The ID of the pipeline. 
-   - `RUN_ID`: The ID of the current run.
+  - `GROUP_SIZE`: Defines the number of jobs processed in a batch. The manager will not queue a new group until the current one is completed.
+  - `MINI_BATCH_SIZE`: Specifies the number of tasks in each job (ie. number of paragraphs in a job)
+  - `HEALTH_INTERVAL`: Time interval in seconds for how often the manager checks for timed out jobs.
+  - `HEALTH_TIMEOUT`: Duration in seconds after which a job is considered timed out if no health check is received. Jobs will be requeued if they have timed out.
+  - `PIPELINE_ID`: The ID of the pipeline. 
+  - `RUN_ID`: The ID of the current run.
 
 2. Run the application:
   - Build the manager:
@@ -33,6 +35,16 @@ This system is structured to work with worker nodes that execute and store resul
 ```docker run -it --env-file .env -p 50051:50051 job-manager --loader-type=weaviate```
 
     - This will continuously queue data from the specified data source.
+
+#### Using Docker Compose to run with workers
+
+1. Set necessary environment variables:
+  - Initialize the environment variables listed above along with any needed for the worker container.
+2. Change Docker Compose settings
+  - Update the worker section of the `docker-compose.yml` file to be compatible with the worker container.
+  - Change the coordinator entrypoint to set the data loader if desired.
+3. Run the application
+  - Run ```docker-compose up --build```
 
 ## API Endpoints
 

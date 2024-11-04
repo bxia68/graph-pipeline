@@ -17,5 +17,5 @@ func StartOnDemandServer(logger *zap.Logger, jobQueue chan *pb.GetJobResponse) {
 	AddEndpoints(logger, r, jobQueue)
 
 	logger.Info("on demand server listening")
-	r.Run(":8080")
+	r.Run(":8000")
 }

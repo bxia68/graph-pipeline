@@ -3,6 +3,7 @@ package handler
 import (
     "encoding/json"
     "fmt"
+    "strings"
     "io/ioutil"
     "net/http"
     "go.uber.org/zap"
@@ -23,8 +24,17 @@ type SubmitJobRequest struct {
     WeaviateData       WeaviateData       `json:"weaviate_data"`
 }
 
+type LegendResponse struct {
+    LegendId uint64 `json:"legend_id"`
+    Descrip  string `json:"descrip"`
+}
+
 func fetchDescriptions(legendId []uint64) (map[uint64]string, error) {
-    url := fmt.Sprintf("https://dev2.macrostrat.org/api/pg/legend?select=legend_id,descrip&descrip=not.is.null&legend_id=in.(%s)", legendId)
+    ids := make([]string, len(legendId))
+    for i, id := range legendId {
+        ids[i] = fmt.Sprintf("%d", id)
+    }
+    url := fmt.Sprintf("https://dev2.macrostrat.org/api/pg/legend?select=legend_id,descrip&descrip=not.is.null&legend_id=in.(%s)", strings.Join(ids, ","))
 
     resp, err := http.Get(url)
     if err != nil {
